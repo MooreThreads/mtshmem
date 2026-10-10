@@ -1,0 +1,6 @@
+MTSHMEM is a parallel programming interface based on OpenSHMEM
+that provides efficient and scalable communication for Moore Threads GPU
+clusters. MTSHMEM creates a global address space for data that spans
+the memory of multiple GPUs and can be accessed with fine-grained
+GPU-initiated operations, CPU-initiated operations, and operations
+on MUSA(R) streams.

@@ -1,0 +1,19 @@
+/*
+ * This file has been modified by Moore Threads Technology Co., Ltd.
+ * Modifications for MTSHMEM are Copyright (c) 2025-2026 Moore Threads Technology Co., Ltd.
+ */
+
+/*
+ * Copyright (c) 2016-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#ifndef SHARED_MEMORY_H
+#define SHARED_MEMORY_H
+
+#include "internal/host/nvshmem_internal.h"  // for nvshmemi_shared_memory_info
+
+int shared_memory_create(const char *name, size_t sz, nvshmemi_shared_memory_info *info);
+int shared_memory_open(const char *name, size_t sz, nvshmemi_shared_memory_info *info);
+void shared_memory_close(char *shm_name, nvshmemi_shared_memory_info *info);
+
+#endif

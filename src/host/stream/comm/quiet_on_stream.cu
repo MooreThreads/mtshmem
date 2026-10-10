@@ -1,0 +1,27 @@
+/*
+ * This file has been modified by Moore Threads Technology Co., Ltd.
+ * Modifications for MTSHMEM are Copyright (c) 2025-2026 Moore Threads Technology Co., Ltd.
+ */
+
+/*
+ * Copyright (c) 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include "internal/host/cuda_runtime_compatible.h"
+#include "internal/host/util.h"
+#include "internal/non_abi/nvshmemi_h_to_d_sync_defs.cuh"
+
+static int nvshmemi_quiet_maxblocksize = -1;
+
+void nvshmemi_call_proxy_quiet_entrypoint(cudaStream_t cstrm) {
+    if (nvshmemi_quiet_maxblocksize == -1) {
+        int tmp;
+        CUDA_RUNTIME_CHECK(cudaOccupancyMaxPotentialBlockSize(
+            &tmp, (int *)&nvshmemi_quiet_maxblocksize, nvshmemi_proxy_quiet_entrypoint));
+    }
+    int status = cudaLaunchKernel((const void *)nvshmemi_proxy_quiet_entrypoint, 1,
+                                  nvshmemi_quiet_maxblocksize, NULL, 0, cstrm);
+    if (status) {
+        NVSHMEMI_ERROR_PRINT("cudaLaunchKernel() failed in nvshmem_quiet_on_stream \n");
+    }
+}

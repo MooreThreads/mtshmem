@@ -1,0 +1,185 @@
+/*
+ * This file has been modified by Moore Threads Technology Co., Ltd.
+ * Modifications for MTSHMEM are Copyright (c) 2025-2026 Moore Threads Technology Co., Ltd.
+ */
+
+/*
+ * Copyright (c) 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <stdio.h>
+#include <assert.h>
+#include <musa.h>
+#include <musa_runtime.h>
+#include <getopt.h>
+#include "utils.h"
+
+#define UNROLL 2
+
+__global__ void bw(double *data_d, double *remote_d, volatile unsigned int *counter_d, int len,
+                   int pe, int iter) {
+    int u, i, j, tid, slice;
+    unsigned int counter;
+    int threads = gridDim.x * blockDim.x;
+    tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    slice = UNROLL * threads;
+
+    for (i = 0; i < iter; i++) {
+        for (j = 0; j < len - slice; j += slice) {
+            for (u = 0; u < UNROLL; ++u) {
+                int idx = j + u * threads + tid;
+                *(remote_d + idx) = *(data_d + idx);
+            }
+            __syncthreads();
+        }
+
+        for (u = 0; u < UNROLL; ++u) {
+            int idx = j + u * threads + tid;
+            if (idx < len) *(remote_d + idx) = *(data_d + idx);
+        }
+
+        // synchronizing across blocks
+        __syncthreads();
+
+        if (!threadIdx.x) {
+            __musa_fence_rel();
+            counter = atomicInc((unsigned int *)counter_d, UINT_MAX);
+            if (counter == (gridDim.x * (i + 1) - 1)) {
+                *(counter_d + 1) += 1;
+            }
+            while (*(counter_d + 1) != i + 1)
+                ;
+        }
+
+        __syncthreads();
+    }
+
+    // synchronizing across blocks
+    __syncthreads();
+
+    if (!threadIdx.x) {
+        __musa_fence_rel();
+        counter = atomicInc((unsigned int *)counter_d, UINT_MAX);
+        if (counter == (gridDim.x * (i + 1) - 1)) {
+            nvshmem_quiet();
+            *(counter_d + 1) += 1;
+        }
+        while (*(counter_d + 1) != i + 1)
+            ;
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int mype, npes;
+    double *data_d = NULL, *remote_d;
+    unsigned int *counter_d;
+
+    read_args(argc, argv);
+    int max_blocks = num_blocks, max_threads = threads_per_block;
+
+    int iter = iters;
+    int skip = warmup_iters;
+
+    int array_size, i;
+    void **h_tables;
+    uint64_t *h_size_arr;
+    double *h_bw;
+
+    float milliseconds;
+    musaEvent_t start, stop;
+
+    init_wrapper(&argc, &argv);
+
+    musaEventCreate(&start);
+    musaEventCreate(&stop);
+
+    mype = nvshmem_my_pe();
+    npes = nvshmem_n_pes();
+
+    if (npes != 2) {
+        fprintf(stderr, "This test requires exactly two processes \n");
+        goto finalize;
+    }
+
+    array_size = max_size_log;
+    alloc_tables(&h_tables, 2, array_size);
+    h_size_arr = (uint64_t *)h_tables[0];
+    h_bw = (double *)h_tables[1];
+
+    if (use_mmap) {
+        data_d = (double *)allocate_mmap_buffer(max_size, mem_handle_type, use_egm, true);
+        DEBUG_PRINT("Allocated mmap buffer\n");
+    } else {
+        data_d = (double *)nvshmem_malloc(max_size);
+        DEBUG_PRINT("Allocated nvshmem malloc buffer\n");
+        MUSA_CHECK(musaMemset(data_d, 0, max_size));
+    }
+
+    remote_d = (double *)nvshmem_ptr((void *)data_d, !mype);
+    if (remote_d == NULL) {
+        fprintf(stderr, "peer memory not accessible for LD/ST \n");
+        goto finalize;
+    }
+
+    MUSA_CHECK(musaMalloc((void **)&counter_d, sizeof(unsigned int) * 2));
+    MUSA_CHECK(musaMemset(counter_d, 0, sizeof(unsigned int) * 2));
+
+    MUSA_CHECK(musaDeviceSynchronize());
+
+    if (mype == 0) {
+        printf("Size(Bytes) \t\t BWGB/sec\n");
+        fflush(stdout);
+    }
+
+    int size;
+    i = 0;
+    if (mype == 0) {
+        for (size = min_size; size <= max_size; size *= step_factor) {
+            int blocks = max_blocks, threads = max_threads;
+            h_size_arr[i] = size;
+
+            MUSA_CHECK(musaMemset(counter_d, 0, sizeof(unsigned int) * 2));
+
+            bw<<<blocks, threads>>>(data_d, remote_d, counter_d, size / sizeof(double), mype, skip);
+            MUSA_CHECK(musaGetLastError());
+            MUSA_CHECK(musaDeviceSynchronize());
+            MUSA_CHECK(musaMemset(counter_d, 0, sizeof(unsigned int) * 2));
+
+            musaEventRecord(start);
+            bw<<<blocks, threads>>>(data_d, remote_d, counter_d, size / sizeof(double), mype, iter);
+            musaEventRecord(stop);
+            MUSA_CHECK(musaGetLastError());
+            MUSA_CHECK(musaEventSynchronize(stop));
+
+            musaEventElapsedTime(&milliseconds, start, stop);
+            h_bw[i] = size / (milliseconds * (B_TO_GB / (iter * MS_TO_S)));
+            nvshmem_barrier_all();
+            i++;
+        }
+    } else {
+        for (size = min_size; size <= max_size; size *= step_factor) {
+            nvshmem_barrier_all();
+        }
+    }
+
+    if (mype == 0) {
+        print_table_basic("shmem_st_bw", "None", "size (Bytes)", "BW", "GB/sec", '+', h_size_arr,
+                          h_bw, i);
+    }
+
+finalize:
+
+    if (data_d) {
+        if (use_mmap) {
+            free_mmap_buffer(data_d);
+        } else {
+            nvshmem_free(data_d);
+        }
+    }
+    free_tables(h_tables, 2);
+    finalize_wrapper();
+
+    return 0;
+}

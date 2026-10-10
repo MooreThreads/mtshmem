@@ -1,0 +1,30 @@
+/*
+ * This file has been modified by Moore Threads Technology Co., Ltd.
+ * Modifications for MTSHMEM are Copyright (c) 2025-2026 Moore Threads Technology Co., Ltd.
+ */
+
+/*
+ * Copyright (c) 2016-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#ifndef _P2P_H
+#define _P2P_H
+
+#include <stdint.h>  // IWYU pragma: keep
+// IWYU pragma: no_include <bits/stdint-uintn.h>
+#include "internal/host_transport/cuda_compatible.h"
+#include "internal/host_transport/nvshmemi_transport_defines.h"
+
+typedef struct {
+    int ndev;
+    CUdevice *cudev;
+    int *devid;
+    CUdeviceptr *curetval;
+    CUdevice cudevice;
+    int device_id;
+    uint64_t hostHash;
+    pcie_id_t *pcie_ids;
+    char pcie_bdf[NVSHMEM_PCIE_BDF_BUFFER_LEN];
+} transport_p2p_state_t;
+
+#endif

@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a focused feature or enhancement for MTSHMEM.
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For substantial API, ABI, transport, architecture, dependency, or workaround changes, discuss the proposal with maintainers first. Do not include confidential information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and validation
+      description: Describe affected APIs, hardware, dependencies, and validation plans.

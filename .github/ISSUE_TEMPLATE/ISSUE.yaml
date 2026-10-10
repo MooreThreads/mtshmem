@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible correctness, crash, hang, or unexpected behavior issue.
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, internal URLs, private IP addresses, customer data, proprietary hardware details, or unsanitized logs.
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      description: Describe the observed and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reproducible example and exact commands.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MTSHMEM version or commit
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: GPU and software environment
+      description: Include sanitized GPU family, driver, MUSA, compiler, OS, and MPI details.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove sensitive information before attaching logs.

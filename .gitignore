@@ -1,0 +1,33 @@
+# Build directories and generated build-system files.
+# Keep these rules scoped so source helpers such as
+# nvshmem4py/cmake/buildWheel.cmake and
+# nvshmem4py/requirements_build.txt remain trackable.
+/build/
+/build-*/
+/cmake-build-*/
+/CMakeCache.txt
+/CMakeFiles/
+/Makefile
+/cmake_install.cmake
+/externals/
+nvshmem4py/build/
+nvshmem4py/dist/
+nvshmem4py/externals/
+.vscode/
+*.diff
+
+settings.json
+git_commit.txt
+version.txt
+
+src/device/comm/transfer_device.cu
+src/include/non_abi/device/pt-to-pt/transfer_device.cuh
+src/include/non_abi/nvshmem_build_options.h
+src/include/non_abi/nvshmem_version.h
+
+__pycache__
+perftest-*.err
+perftest-*.out
+
+perftest_install
+examples_install
